@@ -7,13 +7,11 @@ JUGAR/culebra
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Snake: Obra de Arte Bioluminiscente</title>
-    <!-- Carga de fuente moderna para el HUD -->
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Playfair+Display:ital@1&display=swap" rel="stylesheet">
     <style>
         /* =========================================================
-        ESTILOS CSS: ESTÉTICA INMERSIVA Y RESPONSIVE (TAILWIND SIMULADO)
-        =========================================================
-        */
+
         :root {
             --bg-dark: #020205; /* Fondo más oscuro */
             --snake-head: #00ffff; /* Cian ultra-brillante */
@@ -155,6 +153,7 @@ JUGAR/culebra
         }
     </style>
 </head>
+
 <body>
 
     <div class="game-container">
@@ -390,7 +389,7 @@ JUGAR/culebra
         function updateGame() {
             if (isGameOver) return;
 
-            // Aplica la dirección pendiente
+            // Aplica la dirección pendientes de haber
             if (pendingDirection) {
                 dx = pendingDirection.dx;
                 dy = pendingDirection.dy;
@@ -545,7 +544,7 @@ JUGAR/culebra
             ctx.arc(centerX + TILE_SIZE * 0.05, centerY + TILE_SIZE * 0.05, radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // 2. Bola de Color Base (con Resplandor)
+            // 2. Bola de Color Base con resplandores )
             ctx.shadowColor = baseColor;
             ctx.shadowBlur = TILE_SIZE * 0.5;
             ctx.shadowOffsetX = 0;
