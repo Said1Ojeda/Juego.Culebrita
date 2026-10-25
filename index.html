@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#04040a">
+<title>Culebrita</title>
+<meta name="description" content="La culebrita de toda la vida, con luces de neón, poderes y récord. Se juega en el navegador, con teclado o con el dedo.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Playfair+Display:ital,wght@1,700&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --fondo: #04040a;
+        --tablero: #070b14;
+        --cian: #00f0ff;
+        --azul: #0a7cff;
+        --naranja: #ffaa00;
+        --verde: #39ff14;
+        --morado: #b46bff;
+        --oro: #ffd84d;
+        --rojo: #ff4d5e;
+        --texto: #e9f6ff;
+        --tenue: #7c8aa5;
+        --borde: rgba(0, 240, 255, .18);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+        margin: 0;
+        height: 100%;
+        background: radial-gradient(ellipse at 50% 0%, #0b1a2e 0%, var(--fondo) 60%);
+        color: var(--texto);
+        font-family: 'Inter', system-ui, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior: none;
+    }
+
+    body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom));
+        min-height: 100dvh;
+    }
+
+    .juego { width: min(560px, 100%, calc(100dvh - 220px)); min-width: 280px; }
+
+    header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    h1 {
+        margin: 0;
+        font-family: 'Playfair Display', serif;
+        font-style: italic;
+        font-size: clamp(1.6rem, 6vw, 2.2rem);
+        color: var(--cian);
+        text-shadow: 0 0 18px rgba(0, 240, 255, .55);
+        line-height: 1;
+    }
+
+    .botones-top { display: flex; gap: 8px; }
+
+    .icono {
+        width: 40px; height: 40px;
+        display: grid; place-items: center;
+        border-radius: 12px;
+        border: 1px solid var(--borde);
+        background: rgba(255, 255, 255, .03);
+        color: var(--texto);
+        font-size: 18px;
+        cursor: pointer;
+        transition: background .2s, border-color .2s;
+    }
+    .icono:hover { background: rgba(0, 240, 255, .1); border-color: var(--cian); }
+    .icono:focus-visible, .boton:focus-visible, .opcion:focus-visible { outline: 2px solid var(--cian); outline-offset: 2px; }
+
+    .hud {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    .dato {
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, .03);
+        border: 1px solid var(--borde);
+    }
+    .dato span { display: block; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--tenue); }
+    .dato b { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+    #puntos { color: var(--cian); }
+    #record { color: var(--oro); }
+
+    .tablero {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 18px;
+        overflow: hidden;
+        background: var(--tablero);
+        box-shadow: 0 0 0 1px var(--borde), 0 0 50px rgba(0, 140, 255, .28), inset 0 0 40px rgba(0, 0, 0, .8);
+        touch-action: none;
+        user-select: none;
+    }
+
+    canvas { display: block; width: 100%; height: 100%; }
+
+    .efecto {
+        position: absolute;
+        top: 10px; left: 50%;
+        transform: translateX(-50%);
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: .8rem;
+        font-weight: 600;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity .2s;
+        z-index: 2;
+    }
+    .efecto.visible { opacity: 1; }
+
+    .aviso {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+        font-family: 'Playfair Display', serif;
+        font-style: italic;
+        font-size: clamp(2rem, 9vw, 3.4rem);
+        color: var(--oro);
+        text-shadow: 0 0 24px rgba(255, 216, 77, .7);
+        opacity: 0;
+        z-index: 2;
+    }
+    .aviso.sale { animation: aviso 1.1s ease-out; }
+    @keyframes aviso {
+        0% { opacity: 0; transform: scale(.7); }
+        20% { opacity: 1; transform: scale(1.05); }
+        70% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.1); }
+    }
+
+    .capa {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        text-align: center;
+        background: rgba(4, 4, 10, .88);
+        backdrop-filter: blur(3px);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity .25s, visibility .25s;
+        z-index: 3;
+    }
+    .capa.activa { opacity: 1; visibility: visible; }
+
+    .capa h2 {
+        margin: 0;
+        font-family: 'Playfair Display', serif;
+        font-style: italic;
+        font-size: clamp(2rem, 8vw, 3.2rem);
+        line-height: 1.05;
+    }
+    .capa p { margin: 0; color: var(--tenue); }
+
+    #capa-inicio h2 { color: var(--cian); text-shadow: 0 0 22px rgba(0, 240, 255, .6); }
+    #capa-fin h2 { color: var(--rojo); text-shadow: 0 0 24px rgba(255, 77, 94, .7); animation: late 1.4s infinite alternate; }
+    @keyframes late { to { transform: scale(1.04); } }
+
+    .grupo { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .opcion {
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--borde);
+        background: transparent;
+        color: var(--texto);
+        font: 600 .9rem 'Inter', sans-serif;
+        cursor: pointer;
+    }
+    .opcion[aria-pressed="true"] { background: var(--cian); color: #001018; border-color: var(--cian); box-shadow: 0 0 14px rgba(0, 240, 255, .5); }
+
+    .interruptor { display: flex; align-items: center; gap: 8px; color: var(--tenue); font-size: .9rem; cursor: pointer; }
+    .interruptor input { accent-color: var(--cian); width: 18px; height: 18px; }
+
+    .boton {
+        padding: 12px 26px;
+        border-radius: 12px;
+        border: none;
+        background: var(--cian);
+        color: #001018;
+        font: 800 1.05rem 'Inter', sans-serif;
+        cursor: pointer;
+        box-shadow: 0 0 22px rgba(0, 240, 255, .5);
+        transition: transform .12s;
+    }
+    .boton:active { transform: scale(.96); }
+    .boton.sec { background: transparent; color: var(--texto); border: 1px solid var(--borde); box-shadow: none; }
+
+    .resultado { font-size: 1.1rem; }
+    .resultado b { color: var(--cian); font-size: 1.6rem; }
+    .nuevo-record { color: var(--oro); font-weight: 800; letter-spacing: .05em; text-shadow: 0 0 12px rgba(255, 216, 77, .7); }
+
+    .leyenda { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: .82rem; color: var(--tenue); text-align: left; }
+    .punto { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-top: 3px; }
+
+    .ayuda { font-size: .78rem; color: var(--tenue); }
+    kbd { padding: 1px 6px; border-radius: 5px; border: 1px solid var(--borde); font: inherit; color: var(--texto); }
+
+    /* la cruceta solo sale en pantallas tactiles */
+    .cruceta { display: none; margin-top: 12px; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 56px); gap: 8px; justify-content: center; }
+    .cruceta button {
+        border-radius: 14px;
+        border: 1px solid var(--borde);
+        background: rgba(0, 240, 255, .06);
+        color: var(--cian);
+        font-size: 22px;
+        touch-action: manipulation;
+    }
+    .cruceta button:active { background: rgba(0, 240, 255, .25); }
+    .cruceta [data-dir="arriba"] { grid-column: 2; }
+    .cruceta [data-dir="izquierda"] { grid-column: 1; grid-row: 2; }
+    .cruceta [data-dir="abajo"] { grid-column: 2; grid-row: 2; }
+    .cruceta [data-dir="derecha"] { grid-column: 3; grid-row: 2; }
+
+    @media (pointer: coarse) {
+        .cruceta { display: grid; }
+        .solo-teclado { display: none; }
+        .juego { width: min(560px, 100%, calc(100dvh - 330px)); }
+    }
+
+    footer { font-size: .75rem; color: var(--tenue); }
+    footer a { color: var(--tenue); }
+
+    @media (prefers-reduced-motion: reduce) {
+        #capa-fin h2, .aviso.sale { animation: none; }
+    }
+</style>
+</head>
+<body>
+<main class="juego">
+    <header>
+        <h1>Culebrita</h1>
+        <div class="botones-top">
+            <button class="icono" id="btn-sonido" title="Sonido (M)" aria-label="Sonido">🔊</button>
+            <button class="icono" id="btn-pausa" title="Pausa (P)" aria-label="Pausa">⏸</button>
+        </div>
+    </header>
+
+    <div class="hud">
+        <div class="dato"><span>Puntos</span><b id="puntos">0</b></div>
+        <div class="dato"><span>Récord</span><b id="record">0</b></div>
+        <div class="dato"><span>Nivel</span><b id="nivel">1</b></div>
+    </div>
+
+    <div class="tablero" id="tablero">
+        <canvas id="lienzo"></canvas>
+        <div class="efecto" id="efecto"></div>
+        <div class="aviso" id="aviso"></div>
+
+        <section class="capa activa" id="capa-inicio">
+            <h2>Culebrita</h2>
+            <p>Come, crece y no te muerdas.</p>
+            <div class="grupo" role="group" aria-label="Dificultad">
+                <button class="opcion" data-dificultad="tranquilo">Tranquilo</button>
+                <button class="opcion" data-dificultad="normal">Normal</button>
+                <button class="opcion" data-dificultad="picante">Picante</button>
+            </div>
+            <label class="interruptor"><input type="checkbox" id="chk-paredes"> Atravesar paredes</label>
+            <button class="boton" id="btn-jugar">Jugar</button>
+            <div class="leyenda">
+                <span class="punto" style="background:var(--naranja)"></span><span>Fruta, +1 y creces</span>
+                <span class="punto" style="background:var(--oro)"></span><span>Estrella, +5 pero se va rápido</span>
+                <span class="punto" style="background:var(--verde)"></span><span>Turbo, más rápido y puntos dobles</span>
+                <span class="punto" style="background:var(--morado)"></span><span>Reloj, todo más lento un rato</span>
+            </div>
+            <p class="ayuda solo-teclado"><kbd>←↑↓→</kbd> o <kbd>WASD</kbd> para moverte · <kbd>P</kbd> pausa · <kbd>M</kbd> sonido</p>
+        </section>
+
+        <section class="capa" id="capa-pausa">
+            <h2>En pausa</h2>
+            <button class="boton" id="btn-seguir">Seguir</button>
+            <button class="boton sec" id="btn-menu-pausa">Menú</button>
+        </section>
+
+        <section class="capa" id="capa-fin">
+            <h2 id="msg-fin">JAJAJJAJAJ que bot</h2>
+            <p id="causa"></p>
+            <div class="resultado">Hiciste <b id="puntos-fin">0</b> puntos</div>
+            <div class="nuevo-record" id="nuevo-record" hidden>¡NUEVO RÉCORD!</div>
+            <button class="boton" id="btn-otra">Otra vez</button>
+            <button class="boton sec" id="btn-menu-fin">Menú</button>
+            <p class="ayuda solo-teclado"><kbd>Espacio</kbd> para jugar otra vez</p>
+        </section>
+    </div>
+
+    <div class="cruceta" aria-label="Controles">
+        <button data-dir="arriba" aria-label="Arriba">▲</button>
+        <button data-dir="izquierda" aria-label="Izquierda">◀</button>
+        <button data-dir="abajo" aria-label="Abajo">▼</button>
+        <button data-dir="derecha" aria-label="Derecha">▶</button>
+    </div>
+</main>
+
+<footer>Hecho por <a href="https://github.com/Said1Ojeda">Said Ojeda</a></footer>
+
+<script>
+(() => {
+    const CELDAS = 20;
+
+    const DIFICULTAD = {
+        tranquilo: { paso: 160, piedras: 0 },
+        normal:    { paso: 120, piedras: 0 },
+        picante:   { paso: 95,  piedras: 2 }
+    };
+
+    const DIR = {
+        arriba:    { x: 0, y: -1 },
+        abajo:     { x: 0, y: 1 },
+        izquierda: { x: -1, y: 0 },
+        derecha:   { x: 1, y: 0 }
+    };
+
+    const COLOR = {
+        cian: '#00f0ff', azul: '#0a7cff', naranja: '#ffaa00', verde: '#39ff14',
+        morado: '#b46bff', oro: '#ffd84d', rojo: '#ff4d5e', piedra: '#3a4256'
+    };
+
+    const BONUS = {
+        estrella: { color: COLOR.oro, dura: 5000, peso: 50 },
+        turbo:    { color: COLOR.verde, dura: 7000, peso: 25 },
+        reloj:    { color: COLOR.morado, dura: 7000, peso: 25 }
+    };
+    const EFECTO_MS = 5000;
+
+    const $ = (id) => document.getElementById(id);
+    const lienzo = $('lienzo');
+    const ctx = lienzo.getContext('2d');
+    const tablero = $('tablero');
+
+    // localStorage puede fallar en modo incognito, por eso todo va con try
+    const guardado = {
+        leer(clave, def) {
+            try { const v = localStorage.getItem('culebrita.' + clave); return v === null ? def : JSON.parse(v); }
+            catch (e) { return def; }
+        },
+        poner(clave, valor) {
+            try { localStorage.setItem('culebrita.' + clave, JSON.stringify(valor)); } catch (e) {}
+        }
+    };
+
+    const ajustes = {
+        dificultad: guardado.leer('dificultad', 'normal'),
+        paredes: guardado.leer('paredes', false),
+        sonido: guardado.leer('sonido', true)
+    };
+    const records = guardado.leer('records', {});
+
+    let estado = 'inicio';
+    let culebra, anterior, direccion, cola, crecer;
+    let fruta, bonus, piedras;
+    let puntos, comidas, nivel;
+    let turboHasta, lentoHasta, reloj;
+    let acumulado = 0, ultimo = 0;
+    let particulas = [];
+    let temblor = 0, destello = 0;
+    let tam = 0, celda = 0;
+    let fondo = null;
+
+    // ---------- pantalla ----------
+
+    function medir() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        tam = tablero.clientWidth;
+        lienzo.width = Math.round(tam * dpr);
+        lienzo.height = Math.round(tam * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        celda = tam / CELDAS;
+        pintarFondo(dpr);
+    }
+
+    // el fondo se pinta una vez en otro canvas, redibujar la cuadricula cada frame pesaba mucho en el cel
+    function pintarFondo(dpr) {
+        fondo = document.createElement('canvas');
+        fondo.width = lienzo.width;
+        fondo.height = lienzo.height;
+        const f = fondo.getContext('2d');
+        f.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        f.fillStyle = '#070b14';
+        f.fillRect(0, 0, tam, tam);
+        for (let x = 0; x < CELDAS; x++) {
+            for (let y = 0; y < CELDAS; y++) {
+                if ((x + y) % 2 === 0) {
+                    f.fillStyle = 'rgba(0, 120, 200, .045)';
+                    f.fillRect(x * celda, y * celda, celda, celda);
+                }
+            }
+        }
+        const g = f.createRadialGradient(tam / 2, tam / 2, tam * .2, tam / 2, tam / 2, tam * .75);
+        g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        g.addColorStop(1, 'rgba(0, 0, 0, .55)');
+        f.fillStyle = g;
+        f.fillRect(0, 0, tam, tam);
+    }
+
+    // ---------- partida ----------
+
+    function nuevaPartida() {
+        const medio = Math.floor(CELDAS / 2);
+        culebra = [
+            { x: medio, y: medio },
+            { x: medio - 1, y: medio },
+            { x: medio - 2, y: medio }
+        ];
+        anterior = culebra.map(s => ({ ...s }));
+        direccion = DIR.derecha;
+        cola = [];
+        crecer = 0;
+        puntos = 0;
+        comidas = 0;
+        nivel = 1;
+        reloj = 0;
+        turboHasta = lentoHasta = 0;
+        bonus = null;
+        piedras = [];
+        particulas = [];
+        acumulado = 0;
+        temblor = destello = 0;
+
+        for (let i = 0; i < DIFICULTAD[ajustes.dificultad].piedras; i++) ponerPiedra();
+        fruta = celdaLibre();
+
+        actualizarHud();
+        cambiarEstado('jugando');
+    }
+
+    function pasoActual() {
+        let paso = DIFICULTAD[ajustes.dificultad].paso - (nivel - 1) * 6;
+        paso = Math.max(paso, 55);
+        if (reloj < turboHasta) paso *= .6;
+        if (reloj < lentoHasta) paso *= 1.6;
+        return paso;
+    }
+
+    function tick() {
+        if (cola.length) direccion = cola.shift();
+        anterior = culebra.map(s => ({ ...s }));
+
+        let cabeza = { x: culebra[0].x + direccion.x, y: culebra[0].y + direccion.y };
+
+        if (ajustes.paredes) {
+            cabeza.x = (cabeza.x + CELDAS) % CELDAS;
+            cabeza.y = (cabeza.y + CELDAS) % CELDAS;
+        } else if (cabeza.x < 0 || cabeza.y < 0 || cabeza.x >= CELDAS || cabeza.y >= CELDAS) {
+            return morir('pared');
+        }
+
+        if (piedras.some(p => igual(p, cabeza))) return morir('piedra');
+
+        // la cola se mueve en este mismo paso, asi que no cuenta como choque salvo que este creciendo
+        const cuerpo = crecer > 0 || igual(cabeza, fruta) ? culebra : culebra.slice(0, -1);
+        if (cuerpo.some(s => igual(s, cabeza))) return morir('cuerpo');
+
+        culebra.unshift(cabeza);
+
+        if (igual(cabeza, fruta)) comerFruta();
+        else if (bonus && igual(cabeza, bonus)) comerBonus();
+
+        if (crecer > 0) crecer--;
+        else culebra.pop();
+    }
+
+    function comerFruta() {
+        const doble = reloj < turboHasta;
+        sumar(doble ? 2 : 1, fruta, COLOR.naranja);
+        crecer++;
+        comidas++;
+        sonar('comer');
+
+        if (comidas % 5 === 0) subirNivel();
+        fruta = celdaLibre();
+
+        if (!bonus && Math.random() < .3) {
+            const tipo = sortearBonus();
+            const lugar = celdaLibre();
+            if (lugar) bonus = { ...lugar, tipo, vence: reloj + BONUS[tipo].dura, dura: BONUS[tipo].dura };
+        }
+    }
+
+    function comerBonus() {
+        const b = bonus;
+        bonus = null;
+        if (b.tipo === 'estrella') {
+            sumar(5, b, COLOR.oro);
+            crecer += 2;
+            avisar('+5');
+        } else if (b.tipo === 'turbo') {
+            turboHasta = reloj + EFECTO_MS;
+            lentoHasta = 0;
+            sumar(1, b, COLOR.verde);
+            avisar('¡Turbo!');
+        } else {
+            lentoHasta = reloj + EFECTO_MS;
+            turboHasta = 0;
+            sumar(1, b, COLOR.morado);
+            avisar('Cámara lenta');
+        }
+        sonar('bonus');
+    }
+
+    function sumar(n, donde, color) {
+        puntos += n;
+        explotar(donde, color, 14);
+        actualizarHud();
+    }
+
+    function subirNivel() {
+        nivel++;
+        avisar('Nivel ' + nivel);
+        sonar('nivel');
+        // en picante cada nivel salen mas piedras
+        for (let i = 0; i < DIFICULTAD[ajustes.dificultad].piedras; i++) ponerPiedra();
+        actualizarHud();
+    }
+
+    function morir(causa) {
+        cambiarEstado('fin');
+        temblor = 14;
+        destello = 1;
+        sonar('morir');
+        explotar(culebra[0], COLOR.rojo, 30);
+        if (navigator.vibrate) navigator.vibrate(120);
+
+        const mensajes = {
+            pared: ['Esa pared estaba ahí desde el inicio', 'Ni la viste venir'],
+            cuerpo: ['Te mordiste solito', 'Autogol'],
+            piedra: ['La piedra ganó', 'Piedra 1, tú 0']
+        };
+        // el clasico se queda, sale una de cada tres veces
+        const lista = mensajes[causa];
+        $('msg-fin').textContent = Math.random() < .34 ? 'JAJAJJAJAJ que bot' : lista[Math.floor(Math.random() * lista.length)];
+        $('causa').textContent = { pared: 'Chocaste con la pared', cuerpo: 'Chocaste con tu cola', piedra: 'Chocaste con una piedra' }[causa];
+        $('puntos-fin').textContent = puntos;
+
+        const anteriorRecord = records[ajustes.dificultad] || 0;
+        const esRecord = puntos > anteriorRecord;
+        if (esRecord) {
+            records[ajustes.dificultad] = puntos;
+            guardado.poner('records', records);
+        }
+        $('nuevo-record').hidden = !esRecord || puntos === 0;
+        actualizarHud();
+    }
+
+    // ---------- ayudas del tablero ----------
+
+    function igual(a, b) { return a && b && a.x === b.x && a.y === b.y; }
+
+    function ocupada(c) {
+        return culebra.some(s => igual(s, c)) || piedras.some(p => igual(p, c)) || igual(fruta, c) || igual(bonus, c);
+    }
+
+    function celdaLibre(lejos = 0) {
+        for (let i = 0; i < 400; i++) {
+            const c = { x: Math.floor(Math.random() * CELDAS), y: Math.floor(Math.random() * CELDAS) };
+            const cabeza = culebra[0];
+            if (!ocupada(c) && Math.abs(c.x - cabeza.x) + Math.abs(c.y - cabeza.y) >= lejos) return c;
+        }
+        // si el tablero ya esta muy lleno se busca en orden
+        for (let x = 0; x < CELDAS; x++)
+            for (let y = 0; y < CELDAS; y++)
+                if (!ocupada({ x, y })) return { x, y };
+        return null;
+    }
+
+    // las piedras nunca salen pegadas a la cabeza ni en la fila por donde va
+    function ponerPiedra() {
+        for (let i = 0; i < 50; i++) {
+            const c = celdaLibre(5);
+            if (!c) return;
+            const enCamino = (direccion.x !== 0 && c.y === culebra[0].y) || (direccion.y !== 0 && c.x === culebra[0].x);
+            if (!enCamino) { piedras.push(c); return; }
+        }
+    }
+
+    function sortearBonus() {
+        const total = Object.values(BONUS).reduce((s, b) => s + b.peso, 0);
+        let r = Math.random() * total;
+        for (const [tipo, b] of Object.entries(BONUS)) {
+            if ((r -= b.peso) < 0) return tipo;
+        }
+        return 'estrella';
+    }
+
+    // ---------- controles ----------
+
+    // se guardan hasta 3 giros para que las vueltas rapidas no se pierdan
+    function girar(nombre) {
+        if (estado !== 'jugando') return;
+        const nueva = DIR[nombre];
+        const ultima = cola.length ? cola[cola.length - 1] : direccion;
+        if (nueva.x === -ultima.x && nueva.y === -ultima.y) return;
+        if (nueva === ultima) return;
+        if (cola.length < 3) cola.push(nueva);
+    }
+
+    const TECLAS = {
+        ArrowUp: 'arriba', KeyW: 'arriba',
+        ArrowDown: 'abajo', KeyS: 'abajo',
+        ArrowLeft: 'izquierda', KeyA: 'izquierda',
+        ArrowRight: 'derecha', KeyD: 'derecha'
+    };
+
+    document.addEventListener('keydown', (e) => {
+        activarAudio();
+        if (TECLAS[e.code]) {
+            e.preventDefault();
+            girar(TECLAS[e.code]);
+            return;
+        }
+        if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); alternarPausa(); }
+        else if (e.code === 'KeyM') alternarSonido();
+        else if (e.code === 'Space' || e.code === 'Enter') {
+            if (e.target.tagName === 'BUTTON') return;
+            e.preventDefault();
+            if (estado === 'inicio' || estado === 'fin') nuevaPartida();
+            else alternarPausa();
+        }
+    });
+
+    // deslizar el dedo sobre el tablero
+    let toque = null;
+    tablero.addEventListener('touchstart', (e) => {
+        activarAudio();
+        const t = e.changedTouches[0];
+        toque = { x: t.clientX, y: t.clientY };
+    }, { passive: true });
+    tablero.addEventListener('touchmove', (e) => {
+        if (!toque || estado !== 'jugando') return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - toque.x, dy = t.clientY - toque.y;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 22) return;
+        girar(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'derecha' : 'izquierda') : (dy > 0 ? 'abajo' : 'arriba'));
+        toque = { x: t.clientX, y: t.clientY };
+    }, { passive: true });
+    tablero.addEventListener('touchend', () => { toque = null; });
+
+    document.querySelectorAll('.cruceta button').forEach(b => {
+        b.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            activarAudio();
+            girar(b.dataset.dir);
+        });
+    });
+
+    // ---------- estados y botones ----------
+
+    function cambiarEstado(nuevo) {
+        estado = nuevo;
+        $('capa-inicio').classList.toggle('activa', nuevo === 'inicio');
+        $('capa-pausa').classList.toggle('activa', nuevo === 'pausa');
+        $('capa-fin').classList.toggle('activa', nuevo === 'fin');
+        $('btn-pausa').textContent = nuevo === 'pausa' ? '▶' : '⏸';
+
+        const foco = { inicio: 'btn-jugar', pausa: 'btn-seguir', fin: 'btn-otra' }[nuevo];
+        if (foco) setTimeout(() => $(foco).focus({ preventScroll: true }), 50);
+        if (nuevo === 'inicio') actualizarHud();
+    }
+
+    function alternarPausa() {
+        if (estado === 'jugando') cambiarEstado('pausa');
+        else if (estado === 'pausa') { ultimo = performance.now(); cambiarEstado('jugando'); }
+    }
+
+    // si cambian de pestana o bloquean el cel se pausa solo
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && estado === 'jugando') cambiarEstado('pausa');
+    });
+
+    function elegirDificultad(d) {
+        ajustes.dificultad = d;
+        guardado.poner('dificultad', d);
+        document.querySelectorAll('[data-dificultad]').forEach(b =>
+            b.setAttribute('aria-pressed', b.dataset.dificultad === d ? 'true' : 'false'));
+        actualizarHud();
+    }
+
+    document.querySelectorAll('[data-dificultad]').forEach(b =>
+        b.addEventListener('click', () => elegirDificultad(b.dataset.dificultad)));
+
+    $('chk-paredes').checked = ajustes.paredes;
+    $('chk-paredes').addEventListener('change', (e) => {
+        ajustes.paredes = e.target.checked;
+        guardado.poner('paredes', ajustes.paredes);
+    });
+
+    $('btn-jugar').addEventListener('click', () => { activarAudio(); nuevaPartida(); });
+    $('btn-otra').addEventListener('click', () => { activarAudio(); nuevaPartida(); });
+    $('btn-seguir').addEventListener('click', alternarPausa);
+    $('btn-menu-pausa').addEventListener('click', () => cambiarEstado('inicio'));
+    $('btn-menu-fin').addEventListener('click', () => cambiarEstado('inicio'));
+    $('btn-pausa').addEventListener('click', alternarPausa);
+    $('btn-sonido').addEventListener('click', alternarSonido);
+
+    function actualizarHud() {
+        $('puntos').textContent = puntos || 0;
+        $('record').textContent = records[ajustes.dificultad] || 0;
+        $('nivel').textContent = nivel || 1;
+    }
+
+    function avisar(texto) {
+        const a = $('aviso');
+        a.textContent = texto;
+        a.classList.remove('sale');
+        void a.offsetWidth; // reinicia la animacion si sale otro aviso encima
+        a.classList.add('sale');
+    }
+
+    function mostrarEfecto() {
+        const e = $('efecto');
+        let texto = '', color = '';
+        if (estado === 'jugando' || estado === 'pausa') {
+            if (reloj < turboHasta) { texto = '⚡ Turbo x2 · ' + Math.ceil((turboHasta - reloj) / 1000) + 's'; color = COLOR.verde; }
+            else if (reloj < lentoHasta) { texto = '⏱ Lento · ' + Math.ceil((lentoHasta - reloj) / 1000) + 's'; color = COLOR.morado; }
+        }
+        e.classList.toggle('visible', !!texto);
+        if (texto) {
+            e.textContent = texto;
+            e.style.color = color;
+            e.style.background = color + '22';
+            e.style.border = '1px solid ' + color + '66';
+        }
+    }
+
+    // ---------- sonido ----------
+
+    let audio = null;
+    function activarAudio() {
+        if (audio || !ajustes.sonido) return;
+        try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+
+    function alternarSonido() {
+        ajustes.sonido = !ajustes.sonido;
+        guardado.poner('sonido', ajustes.sonido);
+        $('btn-sonido').textContent = ajustes.sonido ? '🔊' : '🔇';
+        if (ajustes.sonido) activarAudio();
+    }
+
+    function tono(tipo, desde, hasta, dura, volumen, retraso = 0) {
+        const t = audio.currentTime + retraso;
+        const osc = audio.createOscillator();
+        const vol = audio.createGain();
+        osc.type = tipo;
+        osc.frequency.setValueAtTime(desde, t);
+        osc.frequency.exponentialRampToValueAtTime(hasta, t + dura);
+        vol.gain.setValueAtTime(volumen, t);
+        vol.gain.exponentialRampToValueAtTime(.001, t + dura);
+        osc.connect(vol).connect(audio.destination);
+        osc.start(t);
+        osc.stop(t + dura);
+    }
+
+    function sonar(cual) {
+        if (!ajustes.sonido || !audio) return;
+        try {
+            if (cual === 'comer') tono('sine', 520, 1040, .09, .18);
+            else if (cual === 'bonus') { tono('triangle', 660, 990, .1, .2); tono('triangle', 990, 1480, .12, .18, .08); }
+            else if (cual === 'nivel') [523, 659, 784].forEach((f, i) => tono('square', f, f, .1, .07, i * .09));
+            else if (cual === 'morir') tono('sawtooth', 220, 40, .6, .22);
+        } catch (e) {}
+    }
+
+    // ---------- dibujo ----------
+
+    function explotar(c, color, cuantas) {
+        const cx = (c.x + .5) * celda, cy = (c.y + .5) * celda;
+        for (let i = 0; i < cuantas; i++) {
+            const ang = Math.random() * Math.PI * 2;
+            const vel = (.6 + Math.random() * 2.2) * celda / 18;
+            particulas.push({ x: cx, y: cy, vx: Math.cos(ang) * vel, vy: Math.sin(ang) * vel, vida: 1, color, r: celda * (.08 + Math.random() * .1) });
+        }
+        if (particulas.length > 250) particulas.splice(0, particulas.length - 250);
+    }
+
+    function moverParticulas(dt) {
+        const k = dt / 16.7;
+        for (let i = particulas.length - 1; i >= 0; i--) {
+            const p = particulas[i];
+            p.x += p.vx * k;
+            p.y += p.vy * k;
+            p.vx *= .96; p.vy *= .96;
+            p.vida -= .025 * k;
+            if (p.vida <= 0) particulas.splice(i, 1);
+        }
+    }
+
+    function dibujar(avance) {
+        ctx.save();
+        if (temblor > .5) {
+            ctx.translate((Math.random() - .5) * temblor, (Math.random() - .5) * temblor);
+            temblor *= .88;
+        }
+
+        ctx.drawImage(fondo, 0, 0, tam, tam);
+
+        if (culebra) {
+            piedras.forEach(dibujarPiedra);
+            dibujarFruta(fruta);
+            if (bonus) dibujarBonus(bonus);
+            dibujarCulebra(estado === 'jugando' ? avance : 1);
+        }
+
+        ctx.globalCompositeOperation = 'lighter';
+        for (const p of particulas) {
+            ctx.globalAlpha = Math.max(p.vida, 0);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+
+        if (destello > 0) {
+            ctx.fillStyle = `rgba(255, 60, 80, ${destello * .35})`;
+            ctx.fillRect(0, 0, tam, tam);
+            destello = Math.max(0, destello - .04);
+        }
+        ctx.restore();
+    }
+
+    // la culebra se dibuja entre la posicion vieja y la nueva para que se mueva suave y no a brincos
+    function posicion(i, avance) {
+        const a = anterior[i] || culebra[i];
+        const b = culebra[i];
+        if (Math.abs(a.x - b.x) > 1 || Math.abs(a.y - b.y) > 1) return b; // cuando cruza la pared
+        return { x: a.x + (b.x - a.x) * avance, y: a.y + (b.y - a.y) * avance };
+    }
+
+    function dibujarCulebra(avance) {
+        const n = culebra.length;
+        const muerta = estado === 'fin';
+        const turbo = reloj < turboHasta;
+
+        ctx.save();
+        ctx.shadowBlur = celda * .6;
+        for (let i = n - 1; i >= 0; i--) {
+            const p = posicion(i, avance);
+            const t = n > 1 ? i / (n - 1) : 0;
+            const radio = celda * (.46 - t * .14);
+            const color = muerta ? COLOR.rojo : mezclar(turbo ? COLOR.verde : COLOR.cian, COLOR.azul, t);
+            ctx.globalAlpha = muerta ? .55 : 1 - t * .35;
+            ctx.shadowColor = color;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc((p.x + .5) * celda, (p.y + .5) * celda, radio, 0, Math.PI * 2);
+            ctx.fill();
+
+            // relleno entre bolitas para que se vea como un cuerpo y no un collar
+            if (i > 0) {
+                const q = posicion(i - 1, avance);
+                if (Math.abs(q.x - p.x) <= 1 && Math.abs(q.y - p.y) <= 1) {
+                    ctx.lineWidth = radio * 1.7;
+                    ctx.lineCap = 'round';
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo((p.x + .5) * celda, (p.y + .5) * celda);
+                    ctx.lineTo((q.x + .5) * celda, (q.y + .5) * celda);
+                    ctx.stroke();
+                }
+            }
+        }
+        ctx.restore();
+
+        // ojos viendo hacia donde va
+        const c = posicion(0, avance);
+        const cx = (c.x + .5) * celda, cy = (c.y + .5) * celda;
+        const d = direccion;
+        const lado = { x: -d.y, y: d.x };
+        ctx.fillStyle = '#001018';
+        for (const s of [-1, 1]) {
+            const ox = cx + d.x * celda * .14 + lado.x * s * celda * .17;
+            const oy = cy + d.y * celda * .14 + lado.y * s * celda * .17;
+            ctx.beginPath();
+            ctx.arc(ox, oy, celda * .085, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(ox + d.x * celda * .03, oy + d.y * celda * .03, celda * .03, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#001018';
+        }
+    }
+
+    function brillo(x, y, color, radio) {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, radio);
+        g.addColorStop(0, color + '88');
+        g.addColorStop(1, color + '00');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, radio, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function dibujarFruta(f) {
+        if (!f) return;
+        const x = (f.x + .5) * celda, y = (f.y + .5) * celda;
+        const latido = 1 + Math.sin(performance.now() / 180) * .08;
+        brillo(x, y, COLOR.naranja, celda * 1.1);
+        ctx.fillStyle = COLOR.naranja;
+        ctx.beginPath();
+        ctx.arc(x, y + celda * .04, celda * .32 * latido, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 255, 255, .55)';
+        ctx.beginPath();
+        ctx.arc(x - celda * .1, y - celda * .06, celda * .07, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COLOR.verde;
+        ctx.beginPath();
+        ctx.ellipse(x + celda * .08, y - celda * .3, celda * .12, celda * .055, -.6, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function dibujarBonus(b) {
+        const x = (b.x + .5) * celda, y = (b.y + .5) * celda;
+        const color = BONUS[b.tipo].color;
+        const queda = Math.max(0, (b.vence - reloj) / b.dura);
+
+        // parpadea cuando ya se va a ir
+        if (queda < .25 && Math.floor(performance.now() / 120) % 2) return;
+
+        brillo(x, y, color, celda * 1.2);
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = celda * .07;
+        ctx.globalAlpha = .7;
+        ctx.beginPath();
+        ctx.arc(x, y, celda * .46, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * queda);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#001018';
+        ctx.lineWidth = celda * .06;
+        const r = celda * .3;
+
+        if (b.tipo === 'estrella') {
+            ctx.rotate(performance.now() / 900);
+            ctx.beginPath();
+            for (let i = 0; i < 10; i++) {
+                const a = -Math.PI / 2 + i * Math.PI / 5;
+                const rr = i % 2 ? r * .45 : r;
+                ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+            }
+            ctx.closePath();
+            ctx.fill();
+        } else if (b.tipo === 'turbo') {
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#001018';
+            ctx.beginPath();
+            ctx.moveTo(r * .15, -r * .75);
+            ctx.lineTo(-r * .4, r * .1);
+            ctx.lineTo(-r * .02, r * .1);
+            ctx.lineTo(-r * .15, r * .75);
+            ctx.lineTo(r * .4, -r * .1);
+            ctx.lineTo(r * .02, -r * .1);
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, -r * .65);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(r * .45, r * .2);
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    function dibujarPiedra(p) {
+        const x = p.x * celda, y = p.y * celda, m = celda * .08;
+        ctx.fillStyle = COLOR.piedra;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x + m, y + m, celda - m * 2, celda - m * 2, celda * .2);
+        else ctx.rect(x + m, y + m, celda - m * 2, celda - m * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 255, 255, .08)';
+        ctx.fillRect(x + m * 2, y + m * 2, celda * .35, celda * .12);
+    }
+
+    function mezclar(a, b, t) {
+        const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+        const r = Math.round(((pa >> 16) & 255) + ((((pb >> 16) & 255) - ((pa >> 16) & 255)) * t));
+        const g = Math.round(((pa >> 8) & 255) + ((((pb >> 8) & 255) - ((pa >> 8) & 255)) * t));
+        const bl = Math.round((pa & 255) + (((pb & 255) - (pa & 255)) * t));
+        return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
+    }
+
+    // ---------- ciclo ----------
+
+    // un solo requestAnimationFrame para todo el juego, el original arrancaba otro cada vez que reiniciabas
+    function ciclo(ahora) {
+        const dt = Math.min(ahora - (ultimo || ahora), 100);
+        ultimo = ahora;
+
+        if (estado === 'jugando') {
+            reloj += dt;
+            acumulado += dt;
+            let paso = pasoActual();
+            while (acumulado >= paso && estado === 'jugando') {
+                acumulado -= paso;
+                tick();
+                paso = pasoActual();
+            }
+            if (bonus && reloj > bonus.vence) bonus = null;
+        }
+
+        moverParticulas(dt);
+        dibujar(estado === 'jugando' ? Math.min(acumulado / pasoActual(), 1) : 1);
+        mostrarEfecto();
+        requestAnimationFrame(ciclo);
+    }
+
+    window.addEventListener('resize', medir);
+    medir();
+    elegirDificultad(ajustes.dificultad);
+    $('btn-sonido').textContent = ajustes.sonido ? '🔊' : '🔇';
+    requestAnimationFrame(ciclo);
+})();
+</script>
+</body>
+</html>
